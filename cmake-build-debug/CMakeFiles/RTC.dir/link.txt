@@ -1,0 +1,3 @@
+E:\apps\CLion\ch-0\203.7148.70\bin\cmake\win\bin\cmake.exe -E rm -f CMakeFiles\RTC.dir/objects.a
+E:\CodeBlocks\MinGW\bin\ar.exe cr CMakeFiles\RTC.dir/objects.a @CMakeFiles\RTC.dir\objects1.rsp
+E:\CodeBlocks\MinGW\bin\g++.exe -g   -Wl,--whole-archive CMakeFiles\RTC.dir/objects.a -Wl,--no-whole-archive  -o RTC.exe -Wl,--out-implib,libRTC.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\RTC.dir\linklibs.rsp
