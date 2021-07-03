@@ -6,6 +6,24 @@
 
 #IncludeRegexTransform: 
 
+F:/RTC/bitmap_image.hpp
+algorithm
+-
+cmath
+-
+cstdlib
+-
+fstream
+-
+iostream
+-
+iterator
+-
+limits
+-
+string
+-
+
 F:/RTC/main.cpp
 bits/stdc++.h
 -
@@ -17,4 +35,6 @@ windows.h
 -
 GL/glut.h
 -
+bitmap_image.hpp
+F:/RTC/bitmap_image.hpp
 

@@ -4,15 +4,19 @@
 
 #include <windows.h>
 #include <GL/glut.h>
+#include "bitmap_image.hpp"
 using namespace std;
 #define pi (2*acos(0.0))
 
 double cameraHeight;
 double cameraAngle;
+int window_width = 500;
+int window_height = 500;
 int drawgrid;
 int drawaxes;
 double angle;
 double theta = pi/180;
+double fovY;
 double move_dist = 2;
 double bighemiradius=30;
 double smallhemi_and_cylinder_radius=10;
@@ -24,6 +28,8 @@ double totalpart_minus_two_hemis;
 double onlybarrelpart;
 int bulletcount;
 
+
+unsigned int image_width = 768;
 
 struct point
 {
@@ -82,17 +88,20 @@ struct point
 
 };
 
-struct Light
+struct Ray
 {
     point start, dir;
     double color[3];
-    Light()
+    Ray()
     {
         start = point(0, 0, 0);
         dir = point(0, 0, 0);
+        color[0] = 0;
+        color[1] = 1; //green
+        color[2] = 0;
     }
 
-    Light(point start, point dir)
+    Ray(point start, point dir)
     {
         this->start = start;
         this->dir = dir;
@@ -104,6 +113,10 @@ struct Light
         color[0] = r; color[1] =g; color[2]=b;
     }
 };
+
+
+point bulletlocations[1000];
+point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
 
 class Object
 {
@@ -150,12 +163,12 @@ public:
 
     Object() {}
     virtual void draw() {}
-    virtual double intersect(Light ray, double *current_color, int level)
+    virtual double intersect(Ray ray, double *color, int level)
     {
         return -1;
     }
 
-    virtual double intersecting_point(Light ray)
+    virtual double intersecting_point(Ray ray)
     {
         return -1;
     }
@@ -226,6 +239,7 @@ vector <Object*> objects;
 vector <point> lights;
 
 Object *board;
+point L,R,U;
 
 void loadTestData()
 {
@@ -245,10 +259,79 @@ void loadTestData()
 }
 
 
+void capture()
+{
+    bitmap_image image(image_width, image_width);
 
+    double plane_dist = (window_height / 2) / tan(theta*(fovY / 2)); //CHK
+    point topLeft, l, r, u;
 
-point bulletlocations[1000];
-point pos(100,100,0), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
+    l = L.scalermul(plane_dist);
+    r = R.scalermul(window_width / 2);
+    u = U.scalermul( window_height / 2);
+
+    topLeft = u.add(l.add(pos)).sub(r);
+
+    double du = window_width/image_width;
+    double dv = window_height/image_width;
+// Choose middle of the grid cell
+
+   // r = R.scalermul(0.5*du);
+   // u = U.scalermul( 0.5*dv);
+   // topLeft = topLeft.add(r).sub(u);
+
+    int nearest;
+    double t, tMin;
+
+    point corner;
+    double *dummyColor = new double[3];
+
+    for(int i = 0; i < image_width; i++)
+    {
+        for(int j = 0; j < image_width; j++)
+        {
+            corner = topLeft.add(R.scalermul( i * du).sub( U.scalermul( j * dv))) ;
+            Ray ray(pos, corner.sub(pos));
+
+            nearest = -1;
+            tMin = 1e4 * 1.0;
+            for(int k = 0; k < objects.size(); k++)
+            {
+                //by giving level 0 we denote that we  only want to know the nearest object
+                t = objects[k]->intersect(ray, dummyColor, 0);
+
+                if(t > 0 && t < tMin)
+                    tMin = t, nearest = k;
+            }
+
+            if(nearest != -1)
+            {
+                t = objects[nearest]->intersect(ray, dummyColor, 1);
+
+                for(int c = 0; c < 3; c++)
+                {
+                    if(dummyColor[c] < 0.0)
+                        dummyColor[c] = 0.0;
+
+                    else if(dummyColor[c] > 1.0)
+                        dummyColor[c] = 1.0;
+                }
+            }
+
+            else
+                dummyColor[0] = dummyColor[1] = dummyColor[2] = 0.0;
+
+            image.set_pixel(i, j, 255 * dummyColor[0], 255 * dummyColor[1], 255 * dummyColor[2]);
+        }
+    }
+
+    image.save_image("1605093_rayTracing.bmp");
+    image.clear();
+
+    cout << "image captured\n";
+
+}
+
 
 void drawAxes()
 {
@@ -685,6 +768,9 @@ void keyboardListener(unsigned char key, int x,int y){
             onlybarrelpart=(onlybarrelpart-1);
 
             break;
+        case '0':
+            capture();
+            break;
 
 
         default:
@@ -821,7 +907,7 @@ void init(){
     cameraHeight=150.0;
     cameraAngle=1.0;
     angle=0;
-
+    fovY = 80;
     //clear the screen
     glClearColor(0,0,0,0);
 
@@ -835,7 +921,7 @@ void init(){
     glLoadIdentity();
 
     //give PERSPECTIVE parameters
-    gluPerspective(80,	1,	1,	1000.0);
+    gluPerspective(fovY,	1,	1,	1000.0);
     //field of view in the Y (vertically)
     //aspect ratio that determines the field of view in the X direction (horizontally)
     //near distance
@@ -844,7 +930,7 @@ void init(){
 
 int main(int argc, char **argv){
     glutInit(&argc,argv);
-    glutInitWindowSize(500, 500);
+    glutInitWindowSize(window_width , window_height );
     glutInitWindowPosition(0, 0);
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);	//Depth, Double buffer, RGB color
 
