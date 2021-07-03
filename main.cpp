@@ -1,10 +1,10 @@
-#include<stdio.h>
+#include<bits/stdc++.h>
 #include<stdlib.h>
 #include<math.h>
 
 #include <windows.h>
 #include <GL/glut.h>
-
+using namespace std;
 #define pi (2*acos(0.0))
 
 double cameraHeight;
@@ -81,6 +81,171 @@ struct point
     }
 
 };
+
+struct Light
+{
+    point start, dir;
+    double color[3];
+    Light()
+    {
+        start = point(0, 0, 0);
+        dir = point(0, 0, 0);
+    }
+
+    Light(point start, point dir)
+    {
+        this->start = start;
+        this->dir = dir;
+
+       // this->dir.normalize(); magnitude
+    }
+    void setColor( double r,double g, double b)
+    {
+        color[0] = r; color[1] =g; color[2]=b;
+    }
+};
+
+class Object
+{
+public:
+    double color[3];
+    double height, width, length;
+    double ambient_coeff, diffuse_coeff, specular_coeff, reflection_coeff; //Double co_efficients[4]
+    double specular_exponent; // shine
+
+
+    void setAmbientCoeff(double ambientCoeff) {
+        ambient_coeff = ambientCoeff;
+    }
+
+    void setDiffuseCoeff(double diffuseCoeff) {
+        diffuse_coeff = diffuseCoeff;
+    }
+
+    void setSpecularCoeff(double specularCoeff) {
+        specular_coeff = specularCoeff;
+    }
+
+    void setReflectionCoeff(double reflectionCoeff) {
+        reflection_coeff = reflectionCoeff;
+    }
+
+    void setSpecularExponent(double specularExponent) {
+        specular_exponent = specularExponent;
+    }
+
+    void setColor( double r,double g, double b)
+    {
+        color[0] = r;
+        color[1] = g;
+        color[2] = b;
+    }
+    point center; //ref point
+    double radius;
+
+    point leftCorner;
+    double base;
+
+    point A, B, C;
+
+    Object() {}
+    virtual void draw() {}
+    virtual double intersect(Light ray, double *current_color, int level)
+    {
+        return -1;
+    }
+
+    virtual double intersecting_point(Light ray)
+    {
+        return -1;
+    }
+};
+
+
+
+class Sphere : public Object
+{
+public:
+
+    Sphere(point Center, double Radius){
+        center=Center;
+        radius=Radius;
+    }
+
+    void draw()
+    {
+        glPushMatrix();
+        glTranslated(center.x, center.y, center.z);
+        glColor3f(color[0], color[1], color[2]);
+        glutSolidSphere(radius, 90, 90);
+        glPopMatrix();
+
+    }
+
+};
+
+
+class Floor : public Object {
+public:
+    double floorWidth, tileWidth;
+    point origin;
+    int tile_quantity;
+
+    Floor(double floorWidth, double tileWidth) {
+        //    this->ambient_coeff = 0.4;
+        //    this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
+        //    this->specular_exponent = 1.0;
+
+        this->floorWidth = floorWidth;
+        this->tileWidth = tileWidth;
+
+        //left corner
+        this->origin = point(-floorWidth / 2, -floorWidth / 2, 0);
+        this->tile_quantity = this->floorWidth / tileWidth;
+    }
+
+    void draw() {
+        glBegin(GL_QUADS);
+        {
+            for (int i = 0; i < tile_quantity; i++) {
+                for (int j = 0; j < tile_quantity; j++) {
+                    glColor3f((i + j) % 2, (i + j) % 2, (i + j) % 2);
+
+                    glVertex3f(origin.x + i * tileWidth, origin.y + j * tileWidth, origin.z);
+                    glVertex3f(origin.x + i * tileWidth, origin.y + (j + 1) * tileWidth, origin.z);
+                    glVertex3f(origin.x + (i + 1) * tileWidth, origin.y + (j + 1) * tileWidth, origin.z);
+                    glVertex3f(origin.x + (i + 1) * tileWidth, origin.y + j * tileWidth, origin.z);
+                }
+            }
+        }
+        glEnd();
+    }
+
+};
+vector <Object*> objects;
+vector <point> lights;
+
+Object *board;
+
+void loadTestData()
+{
+    board = new Floor(3000, 30);
+    objects.push_back(board);
+    Object *temp;
+    point Center(0,0,10);
+    double Radius = 10;
+    temp=new Sphere(Center, Radius); // Center(0,0,10), Radius 10
+    temp->setColor(1,0,0);
+    //temp->setCoEfficients(0.4,0.2,0.2,0.2)
+    //temp->setShine(1)
+    objects.push_back(temp);
+    point light1(-50,50,50);
+    lights.push_back(light1);
+
+}
+
+
+
 
 point bulletlocations[1000];
 point pos(100,100,0), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
@@ -336,6 +501,29 @@ void drawFlower(double radius,int slices,int stacks)
         }
     }
 }
+
+void drawLightSources()
+{
+   // if(!display_light_source)
+   //     return;
+
+    glColor3f(1, 1, 1);
+    for(int i = 0; i < lights.size(); i++)
+    {
+        glPushMatrix();
+        glTranslated(lights[i].x, lights[i].y, lights[i].z);
+        glutSolidSphere(1, 90, 90);
+        glPopMatrix();
+    }
+}
+
+void drawObjects()
+{
+    drawLightSources();
+    for(auto & object : objects)
+        object->draw();
+}
+
 
 
 
@@ -613,8 +801,9 @@ void display(){
     //add objects
 
     drawAxes();
+    drawObjects();
     drawGrid();
-    drawSS();
+    //drawSS();
     glutSwapBuffers();
 }
 
@@ -659,8 +848,9 @@ int main(int argc, char **argv){
     glutInitWindowPosition(0, 0);
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);	//Depth, Double buffer, RGB color
 
-    glutCreateWindow("1605093 Problem 1");
+    glutCreateWindow("Ray Tracing");
 
+    loadTestData();
     init();
 
     glEnable(GL_DEPTH_TEST);	//enable Depth Testing

@@ -7,7 +7,7 @@
 #IncludeRegexTransform: 
 
 F:/RTC/main.cpp
-stdio.h
+bits/stdc++.h
 -
 stdlib.h
 -
