@@ -86,6 +86,18 @@ struct point
 
     }
 
+    void normalize()
+    {
+        double sqroot = sqrt(x * x + y * y + z * z);
+
+        x /= sqroot;
+        x *= 1.0;
+        y /= sqroot;
+        y *= 1.0;
+        z /= sqroot;
+        z *= 1.0;
+    }
+
 };
 
 struct Ray
@@ -105,8 +117,7 @@ struct Ray
     {
         this->start = start;
         this->dir = dir;
-
-       // this->dir.normalize(); magnitude
+        this->dir.normalize();
     }
     void setColor( double r,double g, double b)
     {
@@ -239,7 +250,6 @@ vector <Object*> objects;
 vector <point> lights;
 
 Object *board;
-point L,R,U;
 
 void loadTestData()
 {
@@ -263,22 +273,22 @@ void capture()
 {
     bitmap_image image(image_width, image_width);
 
-    double plane_dist = (window_height / 2) / tan(theta*(fovY / 2)); //CHK
-    point topLeft, l, r, u;
+    double plane_dist = (window_height / 2) / tan(theta*(fovY / 2));
+    point topLeft, L, R, U;
 
-    l = L.scalermul(plane_dist);
-    r = R.scalermul(window_width / 2);
-    u = U.scalermul( window_height / 2);
+    L = l.scalermul(plane_dist);
+    R = r.scalermul(window_width / 2);
+    U = u.scalermul( window_height / 2);
 
-    topLeft = u.add(l.add(pos)).sub(r);
+    topLeft = U.add(L.add(pos)).sub(R);
 
     double du = window_width/image_width;
     double dv = window_height/image_width;
 // Choose middle of the grid cell
 
-   // r = R.scalermul(0.5*du);
-   // u = U.scalermul( 0.5*dv);
-   // topLeft = topLeft.add(r).sub(u);
+    R = r.scalermul(0.5*du);
+    U = u.scalermul( 0.5*dv);
+    topLeft = topLeft.add(R).sub(U);
 
     int nearest;
     double t, tMin;
@@ -290,7 +300,7 @@ void capture()
     {
         for(int j = 0; j < image_width; j++)
         {
-            corner = topLeft.add(R.scalermul( i * du).sub( U.scalermul( j * dv))) ;
+            corner = topLeft.add(r.scalermul( i * du).sub( u.scalermul( j * dv))) ;
             Ray ray(pos, corner.sub(pos));
 
             nearest = -1;
