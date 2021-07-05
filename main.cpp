@@ -7,6 +7,9 @@
 #include "bitmap_image.hpp"
 using namespace std;
 #define pi (2*acos(0.0))
+#define EPSILON  0.0000001
+#define NEAR_PLANE 1
+#define FAR_PLANE 1000
 
 double cameraHeight;
 double cameraAngle;
@@ -109,7 +112,7 @@ struct Ray
         start = point(0, 0, 0);
         dir = point(0, 0, 0);
         color[0] = 0;
-        color[1] = 1; //green
+        color[1] = 0;
         color[2] = 0;
     }
 
@@ -185,7 +188,12 @@ public:
     }
 };
 
-
+bool between_near_far_plane(double t)
+{
+    return (t >= NEAR_PLANE && t <= FAR_PLANE);
+}
+vector <Object*> objects;
+vector <point> lights;
 
 class Sphere : public Object
 {
@@ -206,6 +214,109 @@ public:
 
     }
 
+    point getNormal(point x, point y)
+    {
+        //normal in that point is (P - C)
+        point temp = x.sub(y);
+        temp.normalize();
+
+        return temp;
+    }
+
+    point getRevReflection(point original_vec, point normal)
+    {
+        double coeff = original_vec.dot( normal) * 2;
+        point reflected_vec,temp;
+        temp = normal.scalermul( coeff);
+        temp = temp.sub(original_vec);
+
+        reflected_vec.normalize();
+
+        return reflected_vec;
+    }
+
+    double intersecting_point(Ray ray) override
+    {
+        point r0 = ray.start, rd = ray.dir ,temp;
+        //point r0 (0,100,0), rd(0,1,0)
+        double a = ray.dir.dot(ray.dir);     //as rd is unit
+        temp = r0.sub(center);
+        double b = 2 * rd.dot(temp);
+        double c = temp.dot(temp) - (radius * radius);
+        double d = (b * b) - (4 * a * c);
+
+        if(d < 0)
+            return -1;
+
+        d = sqrt(d);
+        double t1 = (- b - d) / (2 * a);
+        double t2 = (- b + d) / (2 * a);
+
+        return min(t1, t2);
+    }
+
+    double intersect(Ray ray, double *current_color, int level) override {
+        double t = intersecting_point(ray);
+        point temp;
+
+        if (t <= 0)
+            return -1;
+
+        if (!between_near_far_plane(t))
+            return -1;
+
+        if (level == 0)
+            return t;
+
+        for (int c = 0; c < 3; c++)
+            current_color[c] = (color[c] * ambient_coeff);
+
+        //intersection point is => (r0 + t * rd)
+       // temp = ray.start.add(ray.dir.scalermul(t));
+       // point intersectionPoint = temp;
+       // point normal = getNormal(intersectionPoint, center);
+        //point reflection = getReflection(ray.dir, normal);
+
+        //Illumination
+//        for (int i = 0; i < lights.size(); i++) {
+//            point L = lights[i].sub(intersectionPoint);
+//            L.normalize();
+//
+//            temp = intersectionPoint.add(L.scalermul(EPSILON));
+//            point start = temp;
+//            Ray sunLight(start, L);
+//
+//            point N = getNormal(intersectionPoint, center);
+//            point R = getRevReflection(L, N);
+//
+//            point V = ray.start.sub(intersectionPoint);
+//            V.normalize();
+//
+//            //check if obscured
+//            bool obscured = false;
+//            for (int j = 0; j < objects.size(); j++) {
+//                double temp = objects[j]->intersecting_point(sunLight);
+//
+//                if (temp > 0) {
+//                    obscured = true;
+//                    break;
+//                }
+//            }
+//
+//            if (!obscured) {
+//                double cosTheta = max(0.0, L.dot(N));
+//                double cosPhi = max(0.0, R.dot(V));
+//
+//                double lambart = diffuse_coeff * cosTheta;
+//                double phong = pow(cosPhi, specular_exponent) * specular_coeff;
+//
+//                for (int c = 0; c < 3; c++)
+//                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
+//            }
+//        }
+    }
+
+
 };
 
 
@@ -216,9 +327,9 @@ public:
     int tile_quantity;
 
     Floor(double floorWidth, double tileWidth) {
-        //    this->ambient_coeff = 0.4;
-        //    this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
-        //    this->specular_exponent = 1.0;
+         this->ambient_coeff = 0.4;
+         this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
+         this->specular_exponent = 1.0;
 
         this->floorWidth = floorWidth;
         this->tileWidth = tileWidth;
@@ -246,8 +357,7 @@ public:
     }
 
 };
-vector <Object*> objects;
-vector <point> lights;
+
 
 Object *board;
 
@@ -280,15 +390,22 @@ void capture()
     R = r.scalermul(window_width / 2);
     U = u.scalermul( window_height / 2);
 
-    topLeft = U.add(L.add(pos)).sub(R);
+//    topLeft = pos.add(L);
+//    topLeft = topLeft.sub(R);
+//    topLeft = topLeft.add(U);
+    topLeft = pos.sub(L);
+    topLeft = topLeft.sub(R);
+    topLeft = topLeft.add(U);
+
 
     double du = window_width/image_width;
     double dv = window_height/image_width;
 // Choose middle of the grid cell
 
-    R = r.scalermul(0.5*du);
-    U = u.scalermul( 0.5*dv);
-    topLeft = topLeft.add(R).sub(U);
+//    R = r.scalermul(0.5*du);
+//    U = u.scalermul( 0.5*dv);
+//    topLeft = topLeft.add(R);
+//    topLeft = topLeft.sub(U);
 
     int nearest;
     double t, tMin;
@@ -300,8 +417,13 @@ void capture()
     {
         for(int j = 0; j < image_width; j++)
         {
-            corner = topLeft.add(r.scalermul( i * du).sub( u.scalermul( j * dv))) ;
-            Ray ray(pos, corner.sub(pos));
+            cout << i << " " <<j << "    ";
+            R = r.scalermul( i * du);
+            U = u.scalermul( j * dv);
+            corner = R.sub(U);
+            corner = topLeft.add(corner) ;
+            point corner_minus_eye = corner.sub(pos);
+            Ray ray(pos, corner_minus_eye);
 
             nearest = -1;
             tMin = 1e4 * 1.0;
