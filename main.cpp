@@ -13,8 +13,8 @@ using namespace std;
 
 double cameraHeight;
 double cameraAngle;
-int window_width = 500;
-int window_height = 500;
+double window_width = 500;
+double window_height = 500;
 int drawgrid;
 int drawaxes;
 double angle;
@@ -130,8 +130,8 @@ struct Ray
 
 
 point bulletlocations[1000];
-point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
-
+//point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
+point pos(100, 90, 20),u(0, 0, 1), r(-1/sqrt(2.0),  1/sqrt(2.0), 0), l(-1/sqrt(2.0),  -1/sqrt(2.0), 0);
 class Object
 {
 public:
@@ -237,12 +237,11 @@ public:
 
     double intersecting_point(Ray ray) override
     {
-        point r0 = ray.start, rd = ray.dir ,temp;
+        point r0 = ray.start, rd = ray.dir;
         //point r0 (0,100,0), rd(0,1,0)
         double a = ray.dir.dot(ray.dir);     //as rd is unit
-        temp = r0.sub(center);
-        double b = 2 * rd.dot(temp);
-        double c = temp.dot(temp) - (radius * radius);
+        double b = 2 * rd.dot(r0.sub(center));
+        double c = r0.sub(center).dot(r0.sub(center)) - (radius * radius);
         double d = (b * b) - (4 * a * c);
 
         if(d < 0)
@@ -257,8 +256,6 @@ public:
 
     double intersect(Ray ray, double *current_color, int level) override {
         double t = intersecting_point(ray);
-        point temp;
-
         if (t <= 0)
             return -1;
 
@@ -269,7 +266,7 @@ public:
             return t;
 
         for (int c = 0; c < 3; c++)
-            current_color[c] = (color[c] * ambient_coeff);
+            current_color[c] = color[c];
 
         //intersection point is => (r0 + t * rd)
        // temp = ray.start.add(ray.dir.scalermul(t));
@@ -364,17 +361,23 @@ Object *board;
 void loadTestData()
 {
     board = new Floor(3000, 30);
-    objects.push_back(board);
+    //objects.push_back(board);
     Object *temp;
-    point Center(0,0,10);
+    point Center(40,0,10);
+    point Center1(30,60,20);
     double Radius = 10;
     temp=new Sphere(Center, Radius); // Center(0,0,10), Radius 10
     temp->setColor(1,0,0);
     //temp->setCoEfficients(0.4,0.2,0.2,0.2)
     //temp->setShine(1)
     objects.push_back(temp);
-    point light1(-50,50,50);
+    temp=new Sphere(Center1, 2*Radius); // Center(0,0,10), Radius 10
+    temp->setColor(0,2,0);
+    objects.push_back(temp);
+    point light1(-70,70,70);
     lights.push_back(light1);
+    point light2(70,70,70);
+    lights.push_back(light2);
 
 }
 
@@ -390,22 +393,15 @@ void capture()
     R = r.scalermul(window_width / 2);
     U = u.scalermul( window_height / 2);
 
-//    topLeft = pos.add(L);
-//    topLeft = topLeft.sub(R);
-//    topLeft = topLeft.add(U);
-    topLeft = pos.sub(L);
-    topLeft = topLeft.sub(R);
-    topLeft = topLeft.add(U);
-
+    topLeft = pos.add(L).add(U).sub(R);
 
     double du = window_width/image_width;
     double dv = window_height/image_width;
 // Choose middle of the grid cell
 
-//    R = r.scalermul(0.5*du);
-//    U = u.scalermul( 0.5*dv);
-//    topLeft = topLeft.add(R);
-//    topLeft = topLeft.sub(U);
+    R = r.scalermul(0.5*du);
+    U = u.scalermul( 0.5*dv);
+    topLeft = topLeft.add(R).sub(U);
 
     int nearest;
     double t, tMin;
@@ -417,13 +413,11 @@ void capture()
     {
         for(int j = 0; j < image_width; j++)
         {
-            cout << i << " " <<j << "    ";
-            R = r.scalermul( i * du);
+
+            R = r.scalermul( i * du);  //
             U = u.scalermul( j * dv);
-            corner = R.sub(U);
-            corner = topLeft.add(corner) ;
-            point corner_minus_eye = corner.sub(pos);
-            Ray ray(pos, corner_minus_eye);
+            corner = topLeft.add(R).sub(U);
+            Ray ray(pos, corner.sub(pos));
 
             nearest = -1;
             tMin = 1e4 * 1.0;
@@ -431,7 +425,6 @@ void capture()
             {
                 //by giving level 0 we denote that we  only want to know the nearest object
                 t = objects[k]->intersect(ray, dummyColor, 0);
-
                 if(t > 0 && t < tMin)
                     tMin = t, nearest = k;
             }
@@ -440,14 +433,14 @@ void capture()
             {
                 t = objects[nearest]->intersect(ray, dummyColor, 1);
 
-                for(int c = 0; c < 3; c++)
-                {
-                    if(dummyColor[c] < 0.0)
-                        dummyColor[c] = 0.0;
-
-                    else if(dummyColor[c] > 1.0)
-                        dummyColor[c] = 1.0;
-                }
+//                for(int c = 0; c < 3; c++)
+//                {
+//                    if(dummyColor[c] < 0.0)
+//                        dummyColor[c] = 0.0;
+//
+//                    else if(dummyColor[c] > 1.0)
+//                        dummyColor[c] = 1.0;
+//                }
             }
 
             else
@@ -1039,7 +1032,7 @@ void init(){
     cameraHeight=150.0;
     cameraAngle=1.0;
     angle=0;
-    fovY = 80;
+    fovY = 90;
     //clear the screen
     glClearColor(0,0,0,0);
 
