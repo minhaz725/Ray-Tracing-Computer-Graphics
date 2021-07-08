@@ -13,8 +13,8 @@ using namespace std;
 
 double cameraHeight;
 double cameraAngle;
-int window_width = 500;
-int window_height = 500;
+double window_width = 500;
+double window_height = 500;
 int drawgrid;
 int drawaxes;
 double angle;
@@ -130,8 +130,8 @@ struct Ray
 
 
 point bulletlocations[1000];
-point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
-
+//point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
+point pos(100, 90, 20),u(0, 0, 1), r(-1/sqrt(2.0),  1/sqrt(2.0), 0), l(-1/sqrt(2.0),  -1/sqrt(2.0), 0);
 class Object
 {
 public:
@@ -217,6 +217,7 @@ public:
 
     double intersecting_point(Ray ray) override
     {
+<<<<<<< HEAD
        point r0 = ray.start, rd = ray.dir ,temp;
        // point r0 (0,100,0), rd(0,1,0),temp;
         double a = ray.dir.dot(ray.dir);     //as rd is unit
@@ -224,6 +225,13 @@ public:
         double b = 2 * rd.dot(temp);
        // cout << temp.dot(temp) <<endl;
         double c = temp.dot(temp) - (length * length);
+=======
+        point r0 = ray.start, rd = ray.dir;
+        //point r0 (0,100,0), rd(0,1,0)
+        double a = ray.dir.dot(ray.dir);     //as rd is unit
+        double b = 2 * rd.dot(r0.sub(center));
+        double c = r0.sub(center).dot(r0.sub(center)) - (radius * radius);
+>>>>>>> temp
         double d = (b * b) - (4 * a * c);
      //   cout << a << " " << b << " " << c << " " <<d <<endl;
         if(d < 0)
@@ -238,8 +246,12 @@ public:
 
     double intersect(Ray ray, double *current_color, int level)  {
         double t = intersecting_point(ray);
+<<<<<<< HEAD
 //cout << t<<endl;
         if(t <= 0)
+=======
+        if (t <= 0)
+>>>>>>> temp
             return -1;
 
         if(!between_near_far_plane(t))
@@ -248,7 +260,11 @@ public:
         if(level == 0)
             return t;
 
+<<<<<<< HEAD
         for(int c = 0 ; c < 3; c++)
+=======
+        for (int c = 0; c < 3; c++)
+>>>>>>> temp
             current_color[c] = color[c];
 
     }
@@ -301,11 +317,19 @@ Object *board;
 void loadTestData()
 {
     board = new Floor(3000, 30);
+<<<<<<< HEAD
    // objects.push_back(board);
     Object *temp;
     point Center(0,0,10);
     point Center1(50,50,50);
     double Radius = 50;
+=======
+    //objects.push_back(board);
+    Object *temp;
+    point Center(40,0,10);
+    point Center1(30,60,20);
+    double Radius = 10;
+>>>>>>> temp
     temp=new Sphere(Center, Radius); // Center(0,0,10), Radius 10
     temp->setColor(1,0,0);
     objects.push_back(temp);
@@ -314,8 +338,13 @@ void loadTestData()
     //temp->setCoEfficients(0.4,0.2,0.2,0.2)
     //temp->setShine(1)
     objects.push_back(temp);
-    point light1(-50,50,50);
+    temp=new Sphere(Center1, 2*Radius); // Center(0,0,10), Radius 10
+    temp->setColor(0,2,0);
+    objects.push_back(temp);
+    point light1(-70,70,70);
     lights.push_back(light1);
+    point light2(70,70,70);
+    lights.push_back(light2);
 
 }
 
@@ -339,6 +368,7 @@ void capture()
     R = r.scalermul(window_width / 2);
     U = u.scalermul( window_height / 2);
 
+<<<<<<< HEAD
 //    topLeft = pos.add(L);
 //    topLeft = topLeft.sub(R);
 //    topLeft = topLeft.add(U);
@@ -346,6 +376,9 @@ void capture()
     topLeft = topLeft.sub(R);
     topLeft = topLeft.add(U);
 
+=======
+    topLeft = pos.add(L).add(U).sub(R);
+>>>>>>> temp
 
     double du = window_width/image_width;
     double dv = window_height/image_width;
@@ -353,9 +386,13 @@ void capture()
 
     R = r.scalermul(0.5*du);
     U = u.scalermul( 0.5*dv);
+<<<<<<< HEAD
     topLeft = topLeft.add(R);
     topLeft = topLeft.sub(U);
 
+=======
+    topLeft = topLeft.add(R).sub(U);
+>>>>>>> temp
 
 
 
@@ -363,6 +400,7 @@ void capture()
     {
         for(int j = 0; j < image_width; j++)
         {
+<<<<<<< HEAD
             int nearest;
             double t, tMin;
 
@@ -377,6 +415,13 @@ void capture()
 
             point corner_minus_eye = corner.sub(pos);
             Ray ray(pos, corner_minus_eye);
+=======
+
+            R = r.scalermul( i * du);  //
+            U = u.scalermul( j * dv);
+            corner = topLeft.add(R).sub(U);
+            Ray ray(pos, corner.sub(pos));
+>>>>>>> temp
 
             nearest = -1;
             tMin = 1000000000;
@@ -385,14 +430,23 @@ void capture()
             {
                 //by giving level 0 we denote that we  only want to know the nearest object
                 t = objects[k]->intersect(ray, dummyColor, 0);
+<<<<<<< HEAD
 
                 if(t <= 0) continue;
                 if(t< tMin) {   tMin = t, nearest = k;}
+=======
+                if(t > 0 && t < tMin)
+                    tMin = t, nearest = k;
+>>>>>>> temp
             }
 
             if(nearest != -1)
             {
+<<<<<<< HEAD
                 tMin = objects[nearest]->intersect(ray, dummyColor, 1);
+=======
+                t = objects[nearest]->intersect(ray, dummyColor, 1);
+>>>>>>> temp
 
 //                for(int c = 0; c < 3; c++)
 //                {
@@ -993,7 +1047,7 @@ void init(){
     cameraHeight=150.0;
     cameraAngle=1.0;
     angle=0;
-    fovY = 80;
+    fovY = 90;
     //clear the screen
     glClearColor(0,0,0,0);
 
