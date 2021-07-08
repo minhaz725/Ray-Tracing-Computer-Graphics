@@ -137,28 +137,19 @@ class Object
 public:
     double color[3];
     double height, width, length;
-    double ambient_coeff, diffuse_coeff, specular_coeff, reflection_coeff; //Double co_efficients[4]
-    double specular_exponent; // shine
+    double ambient_coeff, diffuse_coeff, specular_coeff, reflection_coeff;
+    double shine;
 
-
-    void setAmbientCoeff(double ambientCoeff) {
+    void setCoeffs(double ambientCoeff,double diffuseCoeff,double specularCoeff, double reflectionCoeff)
+    {
         ambient_coeff = ambientCoeff;
-    }
-
-    void setDiffuseCoeff(double diffuseCoeff) {
         diffuse_coeff = diffuseCoeff;
-    }
-
-    void setSpecularCoeff(double specularCoeff) {
         specular_coeff = specularCoeff;
-    }
-
-    void setReflectionCoeff(double reflectionCoeff) {
         reflection_coeff = reflectionCoeff;
     }
 
-    void setSpecularExponent(double specularExponent) {
-        specular_exponent = specularExponent;
+    void setShine(double shinevar) {
+        shine = shinevar;
     }
 
     void setColor( double r,double g, double b)
@@ -266,51 +257,50 @@ public:
             return t;
 
         for (int c = 0; c < 3; c++)
-            current_color[c] = color[c];
+            current_color[c] = color[c] * ambient_coeff;
 
-        //intersection point is => (r0 + t * rd)
-        // temp = ray.start.add(ray.dir.scalermul(t));
-        // point intersectionPoint = temp;
-        // point normal = getNormal(intersectionPoint, center);
-        //point reflection = getReflection(ray.dir, normal);
 
-        //Illumination
-//        for (int i = 0; i < lights.size(); i++) {
-//            point L = lights[i].sub(intersectionPoint);
-//            L.normalize();
-//
-//            temp = intersectionPoint.add(L.scalermul(EPSILON));
-//            point start = temp;
-//            Ray sunLight(start, L);
-//
-//            point N = getNormal(intersectionPoint, center);
-//            point R = getRevReflection(L, N);
-//
-//            point V = ray.start.sub(intersectionPoint);
-//            V.normalize();
-//
-//            //check if obscured
-//            bool obscured = false;
-//            for (int j = 0; j < objects.size(); j++) {
-//                double temp = objects[j]->intersecting_point(sunLight);
-//
-//                if (temp > 0) {
-//                    obscured = true;
-//                    break;
-//                }
-//            }
-//
-//            if (!obscured) {
-//                double cosTheta = max(0.0, L.dot(N));
-//                double cosPhi = max(0.0, R.dot(V));
-//
-//                double lambart = diffuse_coeff * cosTheta;
-//                double phong = pow(cosPhi, specular_exponent) * specular_coeff;
-//
-//                for (int c = 0; c < 3; c++)
-//                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
-//            }
-//        }
+        point intersectionPoint = ray.start.add(ray.dir.scalermul(t));
+        point normal = getNormal(intersectionPoint, center);
+        point reflection = getRevReflection(ray.dir, normal);
+
+      //  Illumination
+        for (int i = 0; i < lights.size(); i++) {
+            point L = lights[i].sub(intersectionPoint);
+            L.normalize();
+
+            point start = intersectionPoint.add(L.scalermul(EPSILON));
+            Ray sunLight(start, L);
+
+            point N = getNormal(intersectionPoint, center);
+            point R = getRevReflection(L, N);
+
+            point V = ray.start.sub(intersectionPoint);
+            V.normalize();
+
+            //check if obscured
+            bool obscured = false;
+            for (int j = 0; j < objects.size(); j++) {
+                double temp = objects[j]->intersecting_point(sunLight);
+
+                if (temp > 0) {
+                    obscured = true;
+                    break;
+                }
+            }
+
+            if (!obscured) {
+                double cosTheta = max(0.0, L.dot(N));
+                double cosPhi = max(0.0, R.dot(V));
+
+                double lambart = diffuse_coeff * cosTheta;
+                double phong = pow(cosPhi, shine) * specular_coeff;
+
+                for (int c = 0; c < 3; c++)
+                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
+            }
+        }
+        return t;
     }
 
 
@@ -326,7 +316,7 @@ public:
     Floor(double floorWidth, double tileWidth) {
         this->ambient_coeff = 0.4;
         this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
-        this->specular_exponent = 1.0;
+        this->shine = 1.0;
 
         this->floorWidth = floorWidth;
         this->tileWidth = tileWidth;
@@ -368,11 +358,13 @@ void loadTestData()
     double Radius = 10;
     temp=new Sphere(Center, Radius); // Center(0,0,10), Radius 10
     temp->setColor(1,0,0);
-    //temp->setCoEfficients(0.4,0.2,0.2,0.2)
-    //temp->setShine(1)
+    temp->setCoeffs(0.4,0.2,0.2,0.2);
+    temp->setShine(1);
     objects.push_back(temp);
     temp=new Sphere(Center1, 2*Radius); // Center(0,0,10), Radius 10
-    temp->setColor(0,2,0);
+    temp->setColor(0,1,0);
+    temp->setCoeffs(0.4,0.2,0.2,0.2);
+    temp->setShine(1);
     objects.push_back(temp);
     point light1(-70,70,70);
     lights.push_back(light1);
