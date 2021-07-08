@@ -111,9 +111,9 @@ struct Ray
     {
         start = point(0, 0, 0);
         dir = point(0, 0, 0);
-//        color[0] = 0;
-//        color[1] = 0;
-//        color[2] = 0;
+        color[0] = 0;
+        color[1] = 0;
+        color[2] = 0;
     }
 
     Ray(point start, point dir)
@@ -139,7 +139,6 @@ public:
     double height, width, length;
     double ambient_coeff, diffuse_coeff, specular_coeff, reflection_coeff; //Double co_efficients[4]
     double specular_exponent; // shine
-    point center; //ref point
 
 
     void setAmbientCoeff(double ambientCoeff) {
@@ -168,16 +167,17 @@ public:
         color[1] = g;
         color[2] = b;
     }
+    point center; //ref point
+    double radius;
 
+    point leftCorner;
+    double base;
 
-    //point leftCorner;
-    //double base;
-
-   // point A, B, C;
+    point A, B, C;
 
     Object() {}
     virtual void draw() {}
-    virtual double intersect(Ray ray, double *current_color, int level)
+    virtual double intersect(Ray ray, double *color, int level)
     {
         return -1;
     }
@@ -201,7 +201,7 @@ public:
 
     Sphere(point Center, double Radius){
         center=Center;
-        length=Radius;
+        radius=Radius;
     }
 
     void draw()
@@ -209,31 +209,41 @@ public:
         glPushMatrix();
         glTranslated(center.x, center.y, center.z);
         glColor3f(color[0], color[1], color[2]);
-        glutSolidSphere(length, 90, 90);
+        glutSolidSphere(radius, 90, 90);
         glPopMatrix();
 
     }
 
+    point getNormal(point x, point y)
+    {
+        //normal in that point is (P - C)
+        point temp = x.sub(y);
+        temp.normalize();
+
+        return temp;
+    }
+
+    point getRevReflection(point original_vec, point normal)
+    {
+        double coeff = original_vec.dot( normal) * 2;
+        point reflected_vec,temp;
+        temp = normal.scalermul( coeff);
+        temp = temp.sub(original_vec);
+
+        reflected_vec.normalize();
+
+        return reflected_vec;
+    }
 
     double intersecting_point(Ray ray) override
     {
-<<<<<<< HEAD
-       point r0 = ray.start, rd = ray.dir ,temp;
-       // point r0 (0,100,0), rd(0,1,0),temp;
-        double a = ray.dir.dot(ray.dir);     //as rd is unit
-        temp = r0.sub(center);
-        double b = 2 * rd.dot(temp);
-       // cout << temp.dot(temp) <<endl;
-        double c = temp.dot(temp) - (length * length);
-=======
         point r0 = ray.start, rd = ray.dir;
         //point r0 (0,100,0), rd(0,1,0)
         double a = ray.dir.dot(ray.dir);     //as rd is unit
         double b = 2 * rd.dot(r0.sub(center));
         double c = r0.sub(center).dot(r0.sub(center)) - (radius * radius);
->>>>>>> temp
         double d = (b * b) - (4 * a * c);
-     //   cout << a << " " << b << " " << c << " " <<d <<endl;
+
         if(d < 0)
             return -1;
 
@@ -244,29 +254,63 @@ public:
         return min(t1, t2);
     }
 
-    double intersect(Ray ray, double *current_color, int level)  {
+    double intersect(Ray ray, double *current_color, int level) override {
         double t = intersecting_point(ray);
-<<<<<<< HEAD
-//cout << t<<endl;
-        if(t <= 0)
-=======
         if (t <= 0)
->>>>>>> temp
             return -1;
 
-        if(!between_near_far_plane(t))
+        if (!between_near_far_plane(t))
             return -1;
 
-        if(level == 0)
+        if (level == 0)
             return t;
 
-<<<<<<< HEAD
-        for(int c = 0 ; c < 3; c++)
-=======
         for (int c = 0; c < 3; c++)
->>>>>>> temp
             current_color[c] = color[c];
 
+        //intersection point is => (r0 + t * rd)
+        // temp = ray.start.add(ray.dir.scalermul(t));
+        // point intersectionPoint = temp;
+        // point normal = getNormal(intersectionPoint, center);
+        //point reflection = getReflection(ray.dir, normal);
+
+        //Illumination
+//        for (int i = 0; i < lights.size(); i++) {
+//            point L = lights[i].sub(intersectionPoint);
+//            L.normalize();
+//
+//            temp = intersectionPoint.add(L.scalermul(EPSILON));
+//            point start = temp;
+//            Ray sunLight(start, L);
+//
+//            point N = getNormal(intersectionPoint, center);
+//            point R = getRevReflection(L, N);
+//
+//            point V = ray.start.sub(intersectionPoint);
+//            V.normalize();
+//
+//            //check if obscured
+//            bool obscured = false;
+//            for (int j = 0; j < objects.size(); j++) {
+//                double temp = objects[j]->intersecting_point(sunLight);
+//
+//                if (temp > 0) {
+//                    obscured = true;
+//                    break;
+//                }
+//            }
+//
+//            if (!obscured) {
+//                double cosTheta = max(0.0, L.dot(N));
+//                double cosPhi = max(0.0, R.dot(V));
+//
+//                double lambart = diffuse_coeff * cosTheta;
+//                double phong = pow(cosPhi, specular_exponent) * specular_coeff;
+//
+//                for (int c = 0; c < 3; c++)
+//                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
+//            }
+//        }
     }
 
 
@@ -280,9 +324,9 @@ public:
     int tile_quantity;
 
     Floor(double floorWidth, double tileWidth) {
-         this->ambient_coeff = 0.4;
-         this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
-         this->specular_exponent = 1.0;
+        this->ambient_coeff = 0.4;
+        this->diffuse_coeff = this->specular_coeff = this->reflection_coeff = 0.2;
+        this->specular_exponent = 1.0;
 
         this->floorWidth = floorWidth;
         this->tileWidth = tileWidth;
@@ -317,24 +361,13 @@ Object *board;
 void loadTestData()
 {
     board = new Floor(3000, 30);
-<<<<<<< HEAD
-   // objects.push_back(board);
-    Object *temp;
-    point Center(0,0,10);
-    point Center1(50,50,50);
-    double Radius = 50;
-=======
     //objects.push_back(board);
     Object *temp;
     point Center(40,0,10);
     point Center1(30,60,20);
     double Radius = 10;
->>>>>>> temp
     temp=new Sphere(Center, Radius); // Center(0,0,10), Radius 10
     temp->setColor(1,0,0);
-    objects.push_back(temp);
-    temp=new Sphere(Center1, Radius);
-    temp->setColor(0,1,0);
     //temp->setCoEfficients(0.4,0.2,0.2,0.2)
     //temp->setShine(1)
     objects.push_back(temp);
@@ -353,32 +386,14 @@ void capture()
 {
     bitmap_image image(image_width, image_width);
 
-    for(int i=0;i<image_width;i++) {
-        for (int j = 0; j < image_width; j++) {
-            image.set_pixel(i, j, 0, 255, 0);
-        }
-    }
-
-
-    double tan_calc = theta*(fovY / 2);
-    double plane_dist = (window_height / 2) / tan(tan_calc);
+    double plane_dist = (window_height / 2) / tan(theta*(fovY / 2));
     point topLeft, L, R, U;
 
     L = l.scalermul(plane_dist);
     R = r.scalermul(window_width / 2);
     U = u.scalermul( window_height / 2);
 
-<<<<<<< HEAD
-//    topLeft = pos.add(L);
-//    topLeft = topLeft.sub(R);
-//    topLeft = topLeft.add(U);
-    topLeft = pos.add(L);
-    topLeft = topLeft.sub(R);
-    topLeft = topLeft.add(U);
-
-=======
     topLeft = pos.add(L).add(U).sub(R);
->>>>>>> temp
 
     double du = window_width/image_width;
     double dv = window_height/image_width;
@@ -386,67 +401,37 @@ void capture()
 
     R = r.scalermul(0.5*du);
     U = u.scalermul( 0.5*dv);
-<<<<<<< HEAD
-    topLeft = topLeft.add(R);
-    topLeft = topLeft.sub(U);
-
-=======
     topLeft = topLeft.add(R).sub(U);
->>>>>>> temp
 
+    int nearest;
+    double t, tMin;
 
+    point corner;
+    double *dummyColor = new double[3];
 
     for(int i = 0; i < image_width; i++)
     {
         for(int j = 0; j < image_width; j++)
         {
-<<<<<<< HEAD
-            int nearest;
-            double t, tMin;
-
-            point corner;
-            double *dummyColor = new double[3];
-
-
-            R = r.scalermul( i * du);  //
-            U = u.scalermul( j * dv);
-            corner = topLeft.add(R);
-            corner = corner.sub(U);
-
-            point corner_minus_eye = corner.sub(pos);
-            Ray ray(pos, corner_minus_eye);
-=======
 
             R = r.scalermul( i * du);  //
             U = u.scalermul( j * dv);
             corner = topLeft.add(R).sub(U);
             Ray ray(pos, corner.sub(pos));
->>>>>>> temp
 
             nearest = -1;
-            tMin = 1000000000;
-
+            tMin = 1e4 * 1.0;
             for(int k = 0; k < objects.size(); k++)
             {
                 //by giving level 0 we denote that we  only want to know the nearest object
                 t = objects[k]->intersect(ray, dummyColor, 0);
-<<<<<<< HEAD
-
-                if(t <= 0) continue;
-                if(t< tMin) {   tMin = t, nearest = k;}
-=======
                 if(t > 0 && t < tMin)
                     tMin = t, nearest = k;
->>>>>>> temp
             }
 
             if(nearest != -1)
             {
-<<<<<<< HEAD
-                tMin = objects[nearest]->intersect(ray, dummyColor, 1);
-=======
                 t = objects[nearest]->intersect(ray, dummyColor, 1);
->>>>>>> temp
 
 //                for(int c = 0; c < 3; c++)
 //                {
@@ -458,15 +443,15 @@ void capture()
 //                }
             }
 
-          //  else
-          //      dummyColor[0] = dummyColor[1] = dummyColor[2] = 0.0;
+            else
+                dummyColor[0] = dummyColor[1] = dummyColor[2] = 0.0;
 
-            image.set_pixel(i, j,  dummyColor[0]*255, dummyColor[1]*255, dummyColor[2]*255);
+            image.set_pixel(i, j, 255 * dummyColor[0], 255 * dummyColor[1], 255 * dummyColor[2]);
         }
     }
 
     image.save_image("1605093_rayTracing.bmp");
-   // image.clear();
+    image.clear();
 
     cout << "image captured\n";
 
@@ -727,8 +712,8 @@ void drawFlower(double radius,int slices,int stacks)
 
 void drawLightSources()
 {
-   // if(!display_light_source)
-   //     return;
+    // if(!display_light_source)
+    //     return;
 
     glColor3f(1, 1, 1);
     for(int i = 0; i < lights.size(); i++)
@@ -1015,7 +1000,7 @@ void display(){
     //gluLookAt(100,100,100,	0,0,0,	0,0,1);
     //gluLookAt(200*cos(cameraAngle), 200*sin(cameraAngle), cameraHeight,		0,0,0,		0,0,1);
     gluLookAt(pos.x,pos.y,pos.z,	pos.x+l.x, pos.y+l.y, pos.z+l.z,	  u.x,u.y,u.z);
-    //Point3(0, -200, 10), Point3(0, 0, 0), Vector3(0, 0, 1))
+
 
     //again select MODEL-VIEW
     glMatrixMode(GL_MODELVIEW);
