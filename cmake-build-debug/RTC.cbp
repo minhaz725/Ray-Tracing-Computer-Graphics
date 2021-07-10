@@ -80,6 +80,9 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="F:/RTC/H1605093.h">
+			<Option target="RTC"/>
+		</Unit>
 		<Unit filename="F:/RTC/main.cpp">
 			<Option target="RTC"/>
 		</Unit>

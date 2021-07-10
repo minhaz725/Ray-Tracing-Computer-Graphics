@@ -1,15 +1,14 @@
 #include<bits/stdc++.h>
-#include<stdlib.h>
 #include<math.h>
-
+#include "H1605093.h"
 #include <windows.h>
 #include <GL/glut.h>
 #include "bitmap_image.hpp"
 using namespace std;
 #define pi (2*acos(0.0))
 #define EPSILON  0.0000001
-#define NEAR_PLANE 1
-#define FAR_PLANE 1000
+#define NP 1
+#define FP 1000
 
 double cameraHeight;
 double cameraAngle;
@@ -17,198 +16,26 @@ double window_width = 500;
 double window_height = 500;
 int drawgrid;
 int drawaxes;
-double angle;
 double theta = pi/180;
 double fovY;
 double move_dist = 2;
-double bighemiradius=30;
-double smallhemi_and_cylinder_radius=10;
-double cylinder_height=100;
+int levelOfRecursion;
+int numberOfLights;
 
-double totalpart;
-double totalpart_minus_first_hemi;
-double totalpart_minus_two_hemis;
-double onlybarrelpart;
-int bulletcount;
-int level_of_recursion;
+unsigned int image_width;
+int numberOfObjects;
 
 
-unsigned int image_width = 768;
-
-struct point
-{
-    double x,y,z;
-
-    point(){
-    }
-    point(double a,double b,double c)
-    {
-        x=a;
-        y=b;
-        z=c;
-    }
-
-    point scalermul(double value)
-    {
-        return point(x*value, y*value ,z*value);
-    }
-
-    double dot(point p)
-    {
-        return x*p.x+y*p.y+z*p.z;
-    }
-    point cross(point p)
-    {
-        return point(
-                y*p.z-z*p.y,
-                z*p.x-x*p.z,
-                x*p.y-y*p.x
-        );
-    }
-
-    double magnitude(point p)
-    {
-        return sqrt(x*x+y*y+z*z);
-    }
-
-    point add(point p)
-    {
-        return point(x+p.x,y+p.y,z+p.z);
-    }
-    point sub(point p)
-    {
-        return point(x-p.x,y-p.y,z-p.z);
-    }
-
-    point rotation(point p, double rotationangle)
-    {
-        point rotated;
-        point self(x,y,z);
-        rotated = self.scalermul(cos(rotationangle));
-        rotated = rotated.add( p.cross(self).scalermul(sin(rotationangle)) );
-        return rotated;
-
-    }
-
-    void normalize()
-    {
-        double sqroot = sqrt(x * x + y * y + z * z);
-
-        x /= sqroot;
-        x *= 1.0;
-        y /= sqroot;
-        y *= 1.0;
-        z /= sqroot;
-        z *= 1.0;
-    }
-
-    point getReflection(point normal)
-    {
-        point original_vec(x,y,z);
-        double coeff = original_vec.dot(normal) * 2;
-        point reflected_vec = original_vec.sub(normal.scalermul( coeff));
-
-        reflected_vec.normalize();
-
-        return reflected_vec;
-    }
-
-    point getNormal(point sec)
-    {
-        point fir(x,y,z);
-        point temp = fir.sub(sec);
-        temp.normalize();
-
-        return temp;
-    }
-
-    point getRevReflection(point normal)
-    {
-        point original_vec(x,y,z);
-        double coeff = original_vec.dot( normal) * 2;
-        point reflected_vec = normal.scalermul( coeff).sub(original_vec);
-        reflected_vec.normalize();
-
-        return reflected_vec;
-    }
-
-
-};
-
-struct Ray
-{
-    point start, dir;
-    Ray()
-    {
-        start = point(0, 0, 0);
-        dir = point(0, 0, 0);
-    }
-
-    Ray(point start, point dir)
-    {
-        this->start = start;
-        this->dir = dir;
-        this->dir.normalize();
-    }
-};
-
-
-point bulletlocations[1000];
-//point pos(100,100,100), u(0,0,1), r(-1/sqrt(2),1/sqrt(2),0),l(-1/sqrt(2),-1/sqrt(2),0);
 point pos(100, 90, 20),u(0, 0, 1), r(-1/sqrt(2.0),  1/sqrt(2.0), 0), l(-1/sqrt(2.0),  -1/sqrt(2.0), 0);
-class Object
+
+bool inNearAndFar(double t)
 {
-public:
-    double color[3];
-    double height, width, length;
-    double ambient_coeff, diffuse_coeff, specular_coeff, reflection_coeff;
-    double shine;
-
-    void setCoeffs(double ambientCoeff,double diffuseCoeff,double specularCoeff, double reflectionCoeff)
-    {
-        ambient_coeff = ambientCoeff;
-        diffuse_coeff = diffuseCoeff;
-        specular_coeff = specularCoeff;
-        reflection_coeff = reflectionCoeff;
-    }
-
-    void setShine(double shinevar) {
-        shine = shinevar;
-    }
-
-    void setColor( double r,double g, double b)
-    {
-        color[0] = r;
-        color[1] = g;
-        color[2] = b;
-    }
-    point center; //ref point
-    double radius;
-
-    point leftCorner;
-    double base;
-
-    point A, B, C;
-
-    Object() {}
-    virtual void draw() {}
-    virtual double intersect(Ray ray, double *color, int level)
-    {
-        return -1;
-    }
-
-    virtual double intersecting_point(Ray ray)
-    {
-        return -1;
-    }
-};
-
-bool between_near_far_plane(double t)
-{
-    return (t >= NEAR_PLANE && t <= FAR_PLANE);
+    return (t >= NP && t <= FP);
 }
 vector <Object*> objects;
 vector <point> lights;
+Object *board;
+
 
 class Sphere : public Object
 {
@@ -217,6 +44,8 @@ public:
     Sphere(point Center, double Radius){
         center=Center;
         radius=Radius;
+    }
+    Sphere(){
     }
 
     void draw()
@@ -253,7 +82,7 @@ public:
         if (t <= 0)
             return -1;
 
-        if (!between_near_far_plane(t))
+        if (!inNearAndFar(t))
             return -1;
 
         if (level == 0)
@@ -268,21 +97,22 @@ public:
         point normal = intersectionPoint.getNormal(center);
         point reflection = ray.dir.getReflection(normal);
 
-      //  Illumination
+
         for (int i = 0; i < lights.size(); i++) {
             point L = lights[i].sub(intersectionPoint);
+            L.setColor(lights[i].color[0],lights[i].color[1],lights[i].color[2]);
             L.normalize();
-
+            //cout << L.color[0] << L.color[1] << L.color[2] <<endl;
             point start = intersectionPoint.add(L.scalermul(EPSILON));
             Ray sunLight(start, L);
 
             point N = intersectionPoint.getNormal(center);
-            point R = L.getRevReflection(N);
+            point R = L.getReverseReflection(N);
 
             point V = ray.start.sub(intersectionPoint);
             V.normalize();
 
-            //check if obscured
+
             bool obscured = false;
             for (int j = 0; j < objects.size(); j++) {
                 double temp = objects[j]->intersecting_point(sunLight);
@@ -301,39 +131,43 @@ public:
                 double phong = pow(cosPhi, shine) * specular_coeff;
 
                 for (int c = 0; c < 3; c++)
-                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
+                {
+                    current_color[c] += L.color[c]*lambart * color[c];
+                    current_color[c] += L.color[c]*(phong*1.0) * color[c];
+                }
+
             }
         }
         int nearest, tMin, t2;
 
-//        if(level < level_of_recursion)
-//        {
-//            point start = intersectionPoint.add(reflection);
-//            Ray reflectionRay(start, reflection);
-//
-//            nearest = -1;
-//            tMin = 1e4;
-//            double *reflected_color = new double[3];
-//            reflected_color[0] = reflected_color[1] = reflected_color[2] = 0.0;
-//
-//            for(int k = 0; k < objects.size(); k++)
-//            {
-//                t2 = objects[k]->intersect(reflectionRay, reflected_color, 0);
-//
-//                if(t2 > 0 && t2 < tMin)
-//                    tMin = t2, nearest = k;
-//            }
-//
-//            if(nearest != -1)
-//            {
-//                t2 = objects[nearest]->intersect(reflectionRay, reflected_color, level + 1);
-//
-//                for(int c = 0; c < 3; c++)
-//                    current_color[c] += (reflected_color[c] * reflection_coeff);
-//            }
-//
-//            delete[] reflected_color;
-//        }
+        if(level < levelOfRecursion)
+        {
+            point start = intersectionPoint.add(reflection);
+            Ray reflectionRay(start, reflection);
+
+            nearest = -1;
+            tMin = 1e4;
+            double *reflected_color = new double[3];
+            reflected_color[0] = reflected_color[1] = reflected_color[2] = 0.0;
+
+            for(int k = 0; k < objects.size(); k++)
+            {
+                t2 = objects[k]->intersect(reflectionRay, reflected_color, 0);
+
+                if(t2 > 0 && t2 < tMin)
+                    tMin = t2, nearest = k;
+            }
+
+            if(nearest != -1)
+            {
+                t2 = objects[nearest]->intersect(reflectionRay, reflected_color, level + 1);
+
+                for(int c = 0; c < 3; c++)
+                    current_color[c] += (reflected_color[c] * reflection_coeff);
+            }
+
+            delete[] reflected_color;
+        }
 
         return t;
     }
@@ -383,7 +217,7 @@ public:
         return point(0, 0, 1);
     }
 
-    bool onSurface(point p)
+    bool CheckSurf(point p)
     {
         point dist = p.sub(origin);
 
@@ -413,7 +247,7 @@ public:
 
         point intersectionPoint = ray.start.add(ray.dir.scalermul(t));
 
-        onSurface(intersectionPoint);
+        CheckSurf(intersectionPoint);
         setColor(intersectionPoint);
 
         return t;
@@ -425,7 +259,7 @@ public:
         if (t <= 0)
             return -1;
 
-        if (!between_near_far_plane(t))
+        if (!inNearAndFar(t))
             return -1;
 
         if (level == 0)
@@ -433,8 +267,6 @@ public:
 
         point normal = getNormal();
 
-        //check if the intersection plane is on the checker-board, then determine its color
-        //intersection point is => (r0 + t * rd)
         point intersectionPoint = ray.start.add(ray.dir.scalermul(t));
 
         for (int c = 0; c < 3; c++)
@@ -442,21 +274,21 @@ public:
 
         point reflection = ray.dir.getReflection( normal);
 
-        //Illumination
+
         for (int i = 0; i < lights.size(); i++) {
             point L = lights[i].sub( intersectionPoint);
+            L.setColor(lights[i].color[0],lights[i].color[1],lights[i].color[2]);
             L.normalize();
 
             point start = intersectionPoint.add(L.scalermul( EPSILON));
             Ray sunLight(start, L);
 
             point N = getNormal();
-            point R = L.getRevReflection( N);
+            point R = L.getReverseReflection( N);
 
             point V = ray.start.sub(intersectionPoint);
             V.normalize();
 
-            //check if obscured
             bool obscured = false;
             for (int j = 0; j < objects.size(); j++) {
                 double temp = objects[j]->intersecting_point(sunLight);
@@ -475,22 +307,25 @@ public:
                 double phong = pow(cosPhi, shine) * specular_coeff;
 
                 for (int c = 0; c < 3; c++)
-                    current_color[c] += (lambart * color[c]) + (phong * 1.0);
+                {
+                    current_color[c] +=  L.color[c]*lambart * color[c];
+                    current_color[c] += L.color[c]*(phong * 1.0) * color[c];
+                }
+
             }
 
         }
 
 
-        int nearest, t_min, t2;
+        int nearest, tMin, t2;
 
-        //Reflection
-        if(level < level_of_recursion)
+        if(level < levelOfRecursion)
         {
             point start = intersectionPoint.add(reflection);
             Ray reflectionRay(start, reflection);
 
             nearest = -1;
-            t_min = 1e4;
+            tMin = 1e4;
             double *reflected_color = new double[3];
             reflected_color[0] = reflected_color[1] = reflected_color[2] = 0.0;
 
@@ -498,8 +333,8 @@ public:
             {
                 t2 = objects[k]->intersect(reflectionRay, reflected_color, 0);
 
-                if(t2 > 0 && t2 < t_min)
-                    t_min = t2, nearest = k;
+                if(t2 > 0 && t2 < tMin)
+                    tMin = t2, nearest = k;
             }
 
             if(nearest != -1)
@@ -517,52 +352,45 @@ public:
 
 };
 
-
-Object *board;
-
 void loadTestData()
 {
-    level_of_recursion = 4;
     board = new Floor(3000, 30);
     objects.push_back(board);
+
     Object *temp;
+    cin >> levelOfRecursion;
+    cin >> image_width;
+    cin >> numberOfObjects;
+
+    string str;
+    for(int i = 0; i < numberOfObjects; i++)
+    {
+        cin >> str;
+
+        if(str == "sphere")
+        {
+            temp = new Sphere();
+            cin >> temp->center.x >> temp->center.y >> temp->center.z;
+            cin >> temp->radius;
+        }
 
 
-    point Center1(80,0,25);
-    point Center2(40,0,10);
-    point Center3(30,60,20);
-    point Center4(-15,15,45);
-    double Radius = 10;
+        cin >> temp->color[0] >> temp->color[1] >> temp->color[2];
+        cin >> temp->ambient_coeff >> temp->diffuse_coeff >> temp->specular_coeff >> temp->reflection_coeff;
+        cin >> temp->shine;
 
-    temp=new Sphere(Center1, Radius*2+5); // Center(0,0,10), Radius 10
-    temp->setColor(1,0,0);
-    temp->setCoeffs(0.4,0.2,0.2,0.2);
-    temp->setShine(5);
-    objects.push_back(temp);
+        objects.push_back(temp);
+    }
 
-    temp=new Sphere(Center2, Radius); // Center(0,0,10), Radius 10
-    temp->setColor(0,0,1);
-    temp->setCoeffs(0.4,0.2,0.2,0.2);
-    temp->setShine(5);
-    objects.push_back(temp);
+    cin >> numberOfLights;;
 
-    temp=new Sphere(Center3, Radius+5); // Center(0,0,10), Radius 10
-    temp->setColor(0,0,0);
-    temp->setCoeffs(0.2 ,0.2 ,0.4 ,0.2);
-    temp->setShine(30);
-    objects.push_back(temp);
-
-
-    temp=new Sphere(Center4, Radius*2); // Center(0,0,10), Radius 10
-    temp->setColor(0,1,0);
-    temp->setCoeffs(0.4 ,0.3 ,0.1 ,0.2);
-    temp->setShine(10);
-    objects.push_back(temp);
-
-    point light1(-70,70,70);
-    lights.push_back(light1);
-    point light2(70,70,70);
-    lights.push_back(light2);
+    point p;
+    for(int i = 0; i < numberOfLights; i++)
+    {
+        cin >> p.x >> p.y >> p.z;
+        cin>>p.color[0]>>p.color[1]>>p.color[2];
+        lights.push_back(p);
+    }
 
 }
 
@@ -618,14 +446,14 @@ void capture()
             {
                 t = objects[nearest]->intersect(ray, dummyColor, 1);
 
-//                for(int c = 0; c < 3; c++)
-//                {
-//                    if(dummyColor[c] < 0.0)
-//                        dummyColor[c] = 0.0;
-//
-//                    else if(dummyColor[c] > 1.0)
-//                        dummyColor[c] = 1.0;
-//                }
+                for(int c = 0; c < 3; c++)
+                {
+                    if(dummyColor[c] < 0.0)
+                        dummyColor[c] = 0.0;
+
+                    else if(dummyColor[c] > 1.0)
+                        dummyColor[c] = 1.0;
+                }
             }
 
             else
@@ -636,7 +464,6 @@ void capture()
     }
 
     image.save_image("1605093_rayTracing.bmp");
-    image.clear();
 
     cout << "image captured\n";
 
@@ -705,196 +532,6 @@ void drawGrid()
     }
 }
 
-void drawSquare(double a)
-{
-    //glColor3f(1.0,0.0,0.0);
-    glBegin(GL_QUADS);{
-        glVertex3f( a, a,2);
-        glVertex3f( a,-a,2);
-        glVertex3f(-a,-a,2);
-        glVertex3f(-a, a,2);
-    }glEnd();
-}
-
-
-void drawCircle(double radius,int segments)
-{
-    int i;
-    struct point points[100];
-    glColor3f(0.7,0.7,0.7);
-    //generate points
-    for(i=0;i<=segments;i++)
-    {
-        points[i].x=radius*cos(((double)i/(double)segments)*2*pi);
-        points[i].y=radius*sin(((double)i/(double)segments)*2*pi);
-    }
-    //draw segments using generated points
-    for(i=0;i<segments;i++)
-    {
-        glBegin(GL_LINES);
-        {
-            glVertex3f(points[i].x,points[i].y,0);
-            glVertex3f(points[i+1].x,points[i+1].y,0);
-        }
-        glEnd();
-    }
-}
-
-void drawCylinder(double radius,double height,int segments)
-{
-    int i;
-    double shade;
-    int altercolor = 1;
-    struct point points[100];
-    //generate points
-    for(i=0;i<=segments;i++)
-    {
-        points[i].x=radius*cos(((double)i/(double)segments)*2*pi);
-        points[i].y=radius*sin(((double)i/(double)segments)*2*pi);
-    }
-    //draw triangles using generated points
-    for(i=0;i<segments;i++)
-    {
-        //create shading effect
-        if(i<segments/2)shade=2*(double)i/(double)segments;
-        else shade=2*(1.0-(double)i/(double)segments);
-        //glColor3f(shade,shade,shade);
-
-        altercolor = 1 - altercolor;
-        glColor3f(altercolor,altercolor,altercolor);
-        glBegin(GL_QUADS);
-        {
-            glVertex3f(points[i].x,points[i].y,0);
-            glVertex3f(points[i+1].x,points[i+1].y,0);
-            glVertex3f(points[i].x,points[i].y,height);
-            glVertex3f(points[i+1].x,points[i+1].y,height);
-        }
-        glEnd();
-    }
-}
-
-
-void drawSphere(double radius,int slices,int stacks)
-{
-    struct point points[100][100];
-    int i,j;
-    double h,r;
-    //generate points
-    for(i=0;i<=stacks;i++)
-    {
-        h=radius*sin(((double)i/(double)stacks)*(pi/2));
-        r=radius*cos(((double)i/(double)stacks)*(pi/2));
-        for(j=0;j<=slices;j++)
-        {
-            points[i][j].x=r*cos(((double)j/(double)slices)*2*pi);
-            points[i][j].y=r*sin(((double)j/(double)slices)*2*pi);
-            points[i][j].z=h;
-        }
-    }
-    //draw quads using generated points
-    for(i=0;i<stacks;i++)
-    {
-        glColor3f((double)i/(double)stacks,(double)i/(double)stacks,(double)i/(double)stacks);
-        for(j=0;j<slices;j++)
-        {
-            glBegin(GL_QUADS);{
-                //upper hemisphere
-                glVertex3f(points[i][j].x,points[i][j].y,points[i][j].z);
-                glVertex3f(points[i][j+1].x,points[i][j+1].y,points[i][j+1].z);
-                glVertex3f(points[i+1][j+1].x,points[i+1][j+1].y,points[i+1][j+1].z);
-                glVertex3f(points[i+1][j].x,points[i+1][j].y,points[i+1][j].z);
-                //lower hemisphere
-                glVertex3f(points[i][j].x,points[i][j].y,-points[i][j].z);
-                glVertex3f(points[i][j+1].x,points[i][j+1].y,-points[i][j+1].z);
-                glVertex3f(points[i+1][j+1].x,points[i+1][j+1].y,-points[i+1][j+1].z);
-                glVertex3f(points[i+1][j].x,points[i+1][j].y,-points[i+1][j].z);
-            }glEnd();
-        }
-    }
-}
-
-
-
-void drawHemiSphere(double radius,int slices,int stacks)
-{
-    struct point points[100][100];
-    int i,j;
-    double h,r;
-    int altercolor = 1;
-    //generate points
-    for(i=0;i<=stacks;i++)
-    {
-        h=radius*sin(((double)i/(double)stacks)*(pi/2));
-        r=radius*cos(((double)i/(double)stacks)*(pi/2));
-
-        for(j=0;j<=slices;j++)
-        {
-            points[i][j].x=r*cos(((double)j/(double)slices)*2*pi);
-            points[i][j].y=r*sin(((double)j/(double)slices)*2*pi);
-            points[i][j].z=h;
-        }
-    }
-    //draw quads using generated points
-    for(i=0;i<stacks;i++)
-    {
-        glColor3f((double)i/(double)stacks,(double)i/(double)stacks,(double)i/(double)stacks);
-        for(j=0;j<slices;j++)
-        {
-            altercolor = 1 - altercolor;
-            glColor3f(altercolor,altercolor,altercolor);
-            glBegin(GL_QUADS);{
-                //upper hemisphere
-                glVertex3f(points[i][j].x,points[i][j].y,points[i][j].z);
-                glVertex3f(points[i][j+1].x,points[i][j+1].y,points[i][j+1].z);
-                glVertex3f(points[i+1][j+1].x,points[i+1][j+1].y,points[i+1][j+1].z);
-                glVertex3f(points[i+1][j].x,points[i+1][j].y,points[i+1][j].z);
-
-            }glEnd();
-        }
-    }
-}
-
-
-
-void drawFlower(double radius,int slices,int stacks)
-{
-    struct point points[100][100];
-    int i,j;
-    double h,r;
-    int altercolor=1;
-    //generate points
-    for(i=0;i<=stacks;i++)
-    {
-        h=radius*sin(((double)i/(double)stacks)*(pi/2));
-        r=radius*cos(((double)i/(double)stacks)*(pi/2));
-        r = 2 * radius - r;
-        for(j=0;j<=slices;j++)
-        {
-            points[i][j].x=r*cos(((double)j/(double)slices)*2*pi);
-            points[i][j].y=r*sin(((double)j/(double)slices)*2*pi);
-            points[i][j].z=h;
-        }
-    }
-    //draw quads using generated points
-    for(i=0;i<stacks;i++)
-    {
-        glColor3f((double)i/(double)stacks,(double)i/(double)stacks,(double)i/(double)stacks);
-        for(j=0;j<slices;j++)
-        {
-            altercolor = 1 - altercolor;
-            glColor3f(altercolor,altercolor,altercolor);
-            glBegin(GL_QUADS);{
-                //upper hemisphere
-                glVertex3f(points[i][j].x,points[i][j].y,points[i][j].z);
-                glVertex3f(points[i][j+1].x,points[i][j+1].y,points[i][j+1].z);
-                glVertex3f(points[i+1][j+1].x,points[i+1][j+1].y,points[i+1][j+1].z);
-                glVertex3f(points[i+1][j].x,points[i+1][j].y,points[i+1][j].z);
-
-            }glEnd();
-        }
-    }
-}
-
 void drawLightSources()
 {
     // if(!display_light_source)
@@ -904,6 +541,7 @@ void drawLightSources()
     for(int i = 0; i < lights.size(); i++)
     {
         glPushMatrix();
+        glColor3f(lights[i].color[0], lights[i].color[1], lights[i].color[2]);
         glTranslated(lights[i].x, lights[i].y, lights[i].z);
         glutSolidSphere(1, 90, 90);
         glPopMatrix();
@@ -917,92 +555,6 @@ void drawObjects()
         object->draw();
 }
 
-
-
-
-
-void drawSS()
-{
-
-    glRotatef(90,0,1,0);
-    //white board
-    glPushMatrix();
-    {
-        glTranslatef(0.0,0.0,-800.0);
-        glColor3f(1.0,1.0,1.0);
-        drawSquare(300);
-    }
-    glPopMatrix();
-    glPushMatrix();
-    {
-
-        {
-            //first hemi
-            glRotatef(totalpart,1,0,0);
-            drawHemiSphere(bighemiradius,100,20);
-        }
-
-        {
-            //2nd hemi
-
-            glRotatef(totalpart_minus_first_hemi,0,1,0);
-
-            glRotatef(180,0,1,0);
-            drawHemiSphere(bighemiradius,80,20);
-        }
-
-        {
-            //3rd hemi
-            //3rder center shuru 2nd tar center + 3rder rad
-            glRotatef(onlybarrelpart,0,0,1);
-            glTranslatef(0,0,bighemiradius);
-            glRotatef(totalpart_minus_two_hemis,0,1,0);
-            glTranslatef(0,0,-bighemiradius);
-            glTranslatef(0,0,bighemiradius+smallhemi_and_cylinder_radius);
-            glRotatef(180,0,1,0);
-            drawHemiSphere(smallhemi_and_cylinder_radius,80,20);
-        }
-
-
-        {
-            //cyclinder
-            glRotatef(180,0,1,0);
-            drawCylinder(smallhemi_and_cylinder_radius,cylinder_height,80);
-
-        }
-
-
-        {
-            //flower
-            glTranslatef(0,0,cylinder_height);
-            drawFlower(smallhemi_and_cylinder_radius,80,20);
-        }
-
-
-    }
-    glPopMatrix();
-
-
-
-    for(int i=0;i<bulletcount;i++)
-    {
-        glPushMatrix();
-        {
-
-            glRotatef(bulletlocations[i].x,1,0,0);
-            glRotatef(bulletlocations[i].y,0,1,0);
-            glRotatef(bulletlocations[i].z,0,0,1);
-            glTranslatef(0.0,0.0,-795.0);
-            glColor3f(1.0,0.0,0.0);
-            drawSquare(10);
-        }
-        glPopMatrix();
-    }
-
-
-
-
-}
 
 void keyboardListener(unsigned char key, int x,int y){
 
@@ -1036,47 +588,6 @@ void keyboardListener(unsigned char key, int x,int y){
             break;
         case '9':
             drawgrid=1-drawgrid;
-            break;
-        case 'q':
-            if(totalpart<-45) break;
-            totalpart=(totalpart-1);
-
-            break;
-        case 'w':
-            if(totalpart>45) break;
-            totalpart=(totalpart+1);
-
-            break;
-        case 'e':
-            if(totalpart_minus_first_hemi<-45) break;
-            totalpart_minus_first_hemi=(totalpart_minus_first_hemi-1);
-
-            break;
-        case 'r':
-            if(totalpart_minus_first_hemi>45) break;
-            totalpart_minus_first_hemi=(totalpart_minus_first_hemi+1);
-
-            break;
-        case 'a':
-            if(totalpart_minus_two_hemis>45) break;
-            totalpart_minus_two_hemis=(totalpart_minus_two_hemis+1);
-
-            break;
-        case 's':
-            if(totalpart_minus_two_hemis<-45) break;
-            totalpart_minus_two_hemis=(totalpart_minus_two_hemis-1);
-
-
-            break;
-        case 'd':
-            if(onlybarrelpart>45) break;
-            onlybarrelpart=(onlybarrelpart+1);
-
-            break;
-        case 'f':
-            if(onlybarrelpart<-45) break;
-            onlybarrelpart=(onlybarrelpart-1);
-
             break;
         case '0':
             capture();
@@ -1136,10 +647,7 @@ void mouseListener(int button, int state, int x, int y){	//x, y is the x-y of th
                 double  angleLimit = (atan2 (300, 800))*180/pi;
                 // if ( fabs(totalpart) < angleLimit && fabs(totalpart_minus_first_hemi+ totalpart_minus_two_hemis) < angleLimit )
                 //    {
-                bulletlocations[bulletcount].x=totalpart;
-                bulletlocations[bulletcount].y=totalpart_minus_first_hemi;
-                bulletlocations[bulletcount].z=totalpart_minus_two_hemis;
-                bulletcount++;
+
                 //      }
             }
             break;
@@ -1216,7 +724,6 @@ void init(){
     drawaxes=1;
     cameraHeight=150.0;
     cameraAngle=1.0;
-    angle=0;
     fovY = 90;
     //clear the screen
     glClearColor(0,0,0,0);
@@ -1239,12 +746,13 @@ void init(){
 }
 
 int main(int argc, char **argv){
+    freopen("F:\\RTC\\input.txt", "r", stdin);
     glutInit(&argc,argv);
     glutInitWindowSize(window_width , window_height );
     glutInitWindowPosition(0, 0);
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGB);	//Depth, Double buffer, RGB color
 
-    glutCreateWindow("Ray Tracing");
+    glutCreateWindow("Ray Tracing 1605093");
 
     loadTestData();
     init();

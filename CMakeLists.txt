@@ -3,5 +3,5 @@ project(RTC)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(RTC main.cpp)
+add_executable(RTC main.cpp H1605093.h)
 target_link_libraries(RTC -lopengl32 -lglut32 -lGlaux -lGLU32 -lglui32)
